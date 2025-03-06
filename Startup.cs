@@ -1,18 +1,16 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Kenloadv2AutoBackups
@@ -22,7 +20,6 @@ namespace Kenloadv2AutoBackups
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
-            _ = cronBackupTime();
         }
 
         public IConfiguration Configuration { get; }
@@ -30,12 +27,14 @@ namespace Kenloadv2AutoBackups
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Kenloadv2AutoBackups", Version = "v1" });
             });
+
+            // Register the background service for auto-backups
+            services.AddHostedService<BackupSchedulerService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -46,102 +45,136 @@ namespace Kenloadv2AutoBackups
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Kenloadv2AutoBackups v1"));
-                app.UseDeveloperExceptionPage();
             }
             else
             {
                 app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
+
             app.UseHttpsRedirection();
-
             app.UseRouting();
-
             app.UseAuthorization();
-
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
             });
         }
+    }
 
-        public static async Task cronBackupTime()
+    // Background service for handling auto-backups
+    public class BackupSchedulerService : BackgroundService
+    {
+        private readonly string _requestUrl = "https://localhost:44365/";
+        private readonly string _email = "admin@admin.com";
+        private readonly string _password = "@Admin123";
+        private string _token;
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            string requestUrl = "https://localhost:44365/";
-            string email = "admin@admin.com";
-            string password = "@Admin123";
-            string token = "";
-            while (true)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                token = await getToken(email,password,requestUrl);
-                if(token != null)
+                _token = await GetToken(_email, _password, _requestUrl);
+                if (_token != null)
                 {
-                    try
-                    {
-                        var requestUrl1 = requestUrl + "api/BackUpDB";
-                        using var client1=new HttpClient();
-                        client1.DefaultRequestHeaders.Add("Authorization", "Bearer " + token);
-                        var response1 = await client1.GetAsync(requestUrl1);
-                        var result1=response1.Content.ReadAsStringAsync().Result;
-                        
-                        List<ScheduledBackupDetails> scheduledBackupDetails = JsonConvert.DeserializeObject<List<ScheduledBackupDetails>>(result1);
-                        Console.WriteLine(scheduledBackupDetails);
-                        Console.WriteLine(result1);
-                        ScheduledBackupDetails sbackups=new ScheduledBackupDetails();
-                        foreach(ScheduledBackupDetails backup in scheduledBackupDetails)
-                        {
-                            var res = DateTime.Compare(DateTime.Now, backup.backup_time);
-                            TimeSpan backuptimespan= DateTime.Now-backup.backup_time;
-                            Console.WriteLine(backuptimespan);
-                            Console.WriteLine(backuptimespan.TotalSeconds);
-                            if(res==0 || (backuptimespan.TotalSeconds >=0 && backuptimespan.TotalSeconds <=5))
-                            {
-                                
-                                try
-                                {
-                                    var json2 = JsonConvert.SerializeObject(new { });
-                                    var backupsData=new StringContent(json2,Encoding.UTF8,"application/json");
-                                    var postUrl = requestUrl + "api/DbBackup/CreateBackup?folderpath="+backup.backup_path +"&backupName="+backup.backup_name;
-                                    using var client2= new HttpClient();
-                                    client2.DefaultRequestHeaders.Add("Authorization", "Bearer " + token);
-                                    var response2 = await client2.PostAsync(postUrl,backupsData);
-                                    var result2=response2.Content.ReadAsStringAsync().Result;
-                                    //https://localhost:44365/api/DbBackup/CreateBackup?folderpath=C%3A%5CUsers%5CMasterspace%5CDesktop&backupName=autobackup.sql
-                                    //https://localhost:44365/DbBackup/CreateBackup?folderpath=C:\Users\Masterspace\Desktop&backupName=autobackup.sql
-                                    Console.WriteLine(result2);
-                                    if(result2.Length > 0)
-                                    {
-                                        try
-                                        {
-                                            var postUrl2 = requestUrl + "api/BackUpDB/" + backup.id;
-                                            using var client3 = new HttpClient();
-                                            client3.DefaultRequestHeaders.Add("Authorization", "Bearer " + token);
-                                            var response3 = await client3.DeleteAsync(postUrl2);
-                                            var result3 = response3.Content.ReadAsStringAsync().Result;
-                                        }catch(Exception ex)
-                                        {
-                                            ex.Message.ToString();
-                                        }
-                                    }
-                                }
-                                catch(Exception ex)
-                                {
-                                    ex.Message.ToString();
-                                } 
-                            }
-                        }
-
-                    }
-                    catch (Exception ex)
-                    {
-                        ex.Message.ToString();
-                    }
+                    await CheckAndExecuteBackups();
                 }
+
+                // Wait for 1 minute before checking again
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
             }
         }
 
-        public static async Task<string> getToken(string email, string password, string requestUrl)
+        private async Task CheckAndExecuteBackups()
+        {
+            try
+            {
+                var requestUrl = _requestUrl + "api/BackUpDB";
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("Authorization", "Bearer " + _token);
+                var response = await client.GetAsync(requestUrl);
+                var result = await response.Content.ReadAsStringAsync();
+
+                // Deserialize the JSON response dynamically
+                var scheduledBackups = JsonConvert.DeserializeObject<List<dynamic>>(result);
+                Console.WriteLine($"Found {scheduledBackups.Count} backup schedules.");
+
+                foreach (var backup in scheduledBackups)
+                {
+                    if (ShouldRunBackup(backup))
+                    {
+                        await ExecuteBackup(backup);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking backups: {ex.Message}");
+            }
+        }
+
+        private bool ShouldRunBackup(dynamic backup)
+        {
+            var now = DateTime.Now;
+            var backupTime = DateTime.Parse(backup.backup_time.ToString());
+
+            // Check if the backup should run today based on the schedule
+            bool shouldRunToday = (now.DayOfWeek == DayOfWeek.Monday && backup.backup_m == 1) ||
+                                 (now.DayOfWeek == DayOfWeek.Tuesday && backup.backup_t == 1) ||
+                                 (now.DayOfWeek == DayOfWeek.Wednesday && backup.backup_w == 1) ||
+                                 (now.DayOfWeek == DayOfWeek.Thursday && backup.backup_th == 1) ||
+                                 (now.DayOfWeek == DayOfWeek.Friday && backup.backup_f == 1) ||
+                                 (now.DayOfWeek == DayOfWeek.Saturday && backup.backup_s == 1) ||
+                                 (now.DayOfWeek == DayOfWeek.Sunday && backup.backup_su == 1);
+
+            // Check if the current time matches the backup time
+            if (shouldRunToday && now.TimeOfDay >= backupTime.TimeOfDay && now.TimeOfDay <= backupTime.AddMinutes(5).TimeOfDay)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private async Task ExecuteBackup(dynamic backup)
+        {
+            try
+            {
+                // Create form data
+                var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent(backup.backup_path.ToString()), "folderpath");
+                formData.Add(new StringContent(backup.backup_name.ToString()), "backupFileName");
+
+                // Construct the URL
+                var postUrl = _requestUrl + "api/DbBackup/CreateBackup";
+
+                // Send POST request with form data
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("Authorization", "Bearer " + _token);
+                var response = await client.PostAsync(postUrl, formData);
+                var result = await response.Content.ReadAsStringAsync();
+
+                Console.WriteLine($"Backup result: {result}");
+
+                // If the backup was successful, delete the backup record
+                if (result.Length > 0)
+                {
+                    var deleteUrl = _requestUrl + "api/BackUpDB/" + backup.id;
+                    using var deleteClient = new HttpClient();
+                    deleteClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + _token);
+                    var deleteResponse = await deleteClient.DeleteAsync(deleteUrl);
+                    var deleteResult = await deleteResponse.Content.ReadAsStringAsync();
+
+                    Console.WriteLine($"Delete result: {deleteResult}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error executing backup: {ex.Message}");
+            }
+        }
+
+        private async Task<string> GetToken(string email, string password, string requestUrl)
         {
             try
             {
@@ -150,33 +183,15 @@ namespace Kenloadv2AutoBackups
                 var authUrl = requestUrl + "api/authmanagement/login";
                 using var client = new HttpClient();
                 var response = await client.PostAsync(authUrl, serializedData);
-                var result = response.Content.ReadAsStringAsync().Result;
-                TokenInfo tokenInfo = JsonConvert.DeserializeObject<TokenInfo>(result);
+                var result = await response.Content.ReadAsStringAsync();
+                var tokenInfo = JsonConvert.DeserializeObject<dynamic>(result);
                 return tokenInfo.token;
             }
             catch (Exception ex)
             {
-                ex.Message.ToString();
+                Console.WriteLine($"Error getting token: {ex.Message}");
                 return null;
             }
         }
-        public class TokenInfo
-        {
-            public string token { get; set; }
-            public string success { get; set; }
-            public string errors { get; set; }
-        }
-        public class ScheduledBackupDetails
-        {
-            public int id { get; set; }
-            public int backup_delete { get; set; }
-            public DateTime backup_time { get; set; }
-            public string dayoftheweek { get; set; }
-            public String backup_name { get; set; }
-            public String backup_path { get; set; }
-            public String fullincr { get; set; }
-        }
-
     }
-
 }

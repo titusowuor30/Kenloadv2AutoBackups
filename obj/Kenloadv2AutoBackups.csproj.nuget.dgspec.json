@@ -1,20 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\Masterspace\\Documents\\projects\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj": {}
+    "D:\\Projects\\KeNHA\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj": {}
   },
   "projects": {
-    "c:\\Users\\Masterspace\\Documents\\projects\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj": {
+    "D:\\Projects\\KeNHA\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\Masterspace\\Documents\\projects\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj",
+        "projectUniqueName": "D:\\Projects\\KeNHA\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj",
         "projectName": "Kenloadv2AutoBackups",
-        "projectPath": "c:\\Users\\Masterspace\\Documents\\projects\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj",
-        "packagesPath": "C:\\Users\\Masterspace\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\Masterspace\\Documents\\projects\\Kenloadv2AutoBackups\\obj\\",
+        "projectPath": "D:\\Projects\\KeNHA\\Kenloadv2AutoBackups\\Kenloadv2AutoBackups.csproj",
+        "packagesPath": "C:\\Users\\bob\\.nuget\\packages\\",
+        "outputPath": "D:\\Projects\\KeNHA\\Kenloadv2AutoBackups\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
+        ],
         "configFilePaths": [
-          "C:\\Users\\Masterspace\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\bob\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -34,6 +37,11 @@
           "warnAsError": [
             "NU1605"
           ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
         }
       },
       "frameworks": {
@@ -55,16 +63,11 @@
             "net47",
             "net471",
             "net472",
-            "net48"
+            "net48",
+            "net481"
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[5.0.14, 5.0.14]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -73,7 +76,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.102\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.205\\RuntimeIdentifierGraph.json"
         }
       }
     }

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Kenloadv2AutoBackups")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f4b60dca20710271c6e0cbf959dac4ecc08332cb")]
 [assembly: System.Reflection.AssemblyProductAttribute("Kenloadv2AutoBackups")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Kenloadv2AutoBackups")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
