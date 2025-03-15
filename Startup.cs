@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -65,7 +66,7 @@ namespace Kenloadv2AutoBackups
     // Background service for handling auto-backups
     public class BackupSchedulerService : BackgroundService
     {
-        private readonly string _requestUrl = "https://localhost:44365/";
+        private readonly string _requestUrl = "https://kenload.kenha.co.ke:4444/";
         private readonly string _email = "admin@admin.com";
         private readonly string _password = "@Admin123";
         private string _token;
@@ -140,18 +141,23 @@ namespace Kenloadv2AutoBackups
         {
             try
             {
-                // Create form data
-                var formData = new MultipartFormDataContent();
-                formData.Add(new StringContent(backup.backup_path.ToString()), "folderpath");
-                formData.Add(new StringContent(backup.backup_name.ToString()), "backupFileName");
+                // Create the JSON payload
+                var jsonPayload = new
+                {
+                    folderpath = backup.backup_path.ToString(),
+                    backupFileName = backup.backup_name.ToString()
+                };
+
+                // Serialize the JSON payload
+                var jsonContent = JsonContent.Create(jsonPayload);
 
                 // Construct the URL
                 var postUrl = _requestUrl + "api/DbBackup/CreateBackup";
 
-                // Send POST request with form data
+                // Send POST request with JSON data
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Add("Authorization", "Bearer " + _token);
-                var response = await client.PostAsync(postUrl, formData);
+                var response = await client.PostAsync(postUrl, jsonContent);
                 var result = await response.Content.ReadAsStringAsync();
 
                 Console.WriteLine($"Backup result: {result}");
